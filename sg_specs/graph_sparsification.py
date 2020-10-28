@@ -47,7 +47,10 @@ if __name__ == '__main__':
     
     In this example we show how you can do that.
     """
-    xys = np.random.uniform(-20, 20, [1600, 2])
+    with doc:
+        np.random.seed(100)
+        xys = np.random.uniform(-20, 20, [1600, 2])
+
     dense_graph = spec_dense_graph(xys, r_min=2)
     dense_edges = [*dense_graph.edges][::10]
 

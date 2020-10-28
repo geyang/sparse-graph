@@ -24,7 +24,7 @@ The new dedupe API allows us to do this in a batch fashion:
        graph.extend(xys, images=xys, meta=xys)
    else:
        m = ds.min(axis=-1) >= r_min
-       if m.sum() > 0:
+       if m.any():
            graph.extend(xys[m], images=xys[m], meta=xys[m])
        graph.update_edges()
 

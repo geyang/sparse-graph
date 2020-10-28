@@ -6,6 +6,10 @@ sparingly. However sometimes, it is nice to be able to sparsify a graph in-place
 
 In this example we show how you can do that.
 
+```python
+np.random.seed(100)
+xys = np.random.uniform(-20, 20, [1600, 2])
+```
 
 Insert each vertex individually, and only when it is at least `r_min=2` away 
 from existing nodes.
@@ -28,6 +32,6 @@ graph.update_edges()
 ```
 | **Dense (10% of the edges)** | **Batch** |
 |:----------------------------:|:---------:|
-| <img style="align-self:center;" src="figures/dense_graph.png?ts=060809" image="None" styles="{'margin': '0.5em'}" width="None" height="None"/> | <img style="align-self:center;" src="figures/batch_graph.png?ts=637774" image="None" styles="{'margin': '0.5em'}" width="None" height="None"/> |
+| <img style="align-self:center;" src="figures/dense_graph.png?ts=848747" image="None" styles="{'margin': '0.5em'}" width="None" height="None"/> | <img style="align-self:center;" src="figures/batch_graph.png?ts=578331" image="None" styles="{'margin': '0.5em'}" width="None" height="None"/> |
 
 

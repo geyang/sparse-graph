@@ -26,13 +26,15 @@ def spec_individual_add(xys, r_min):
 def spec_batch_add(xys, r_min):
     doc @ f"""
     # Insert new vertices in a batched mode (slightly faster).
-    
-    We have to dedupe within the inserted batch, otherwise adding the whole batch is 
-    the same as the non-sparse add. 
     """
     with doc:
         graph = AsymMesh(n=10_000, k=6, dim=2, img_dim=[2], kernel_fn=l2, embed_fn=id2D, d_max=20)
 
+    doc @ """
+    We have to dedupe within the inserted batch, otherwise adding the whole batch is 
+    the same as the non-sparse add. 
+    """
+    with doc:
         spots = graph.dedupe(images=xys, r_min=r_min)
         xys = xys[spots]
         ds = graph.to_goal(zs_2=xys)
@@ -40,7 +42,7 @@ def spec_batch_add(xys, r_min):
             graph.extend(xys, images=xys, meta=xys)
         else:
             m = ds.min(axis=-1) >= r_min
-            if m.sum() > 0:
+            if m.any():
                 graph.extend(xys[m], images=xys[m], meta=xys[m])
         graph.update_edges()
     return graph
@@ -57,7 +59,10 @@ if __name__ == '__main__':
     doc @ """
     # Compare Adding New Vertices Individually vs In Batches
     """
-    xys = np.random.uniform(-20, 20, [1600, 2])
+    with doc:
+        np.random.seed(100)
+        xys = np.random.uniform(-20, 20, [1600, 2])
+
     sparse_graph = spec_individual_add(xys, r_min=2)
     batch_graph = spec_batch_add(xys, r_min=2)
 
@@ -78,7 +83,7 @@ if __name__ == '__main__':
     for i, j in tqdm(sparse_graph.edges, desc="sparse"):
         a, b = sparse_graph.meta[[i, j]]
         plt.plot([a[0], b[0]], [a[1], b[1]], color="red", linewidth=0.4)
-    r.savefig(f"figures/sparse_graph.png?ts={doc.now('%f')}", title="Sparse")
+    r.savefig(f"figures/sparse_graph.png?ts={doc.now('%f')}", title="Incremental Sparsification")
     plt.close()
 
     doc @ """
