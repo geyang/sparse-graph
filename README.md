@@ -1,8 +1,9 @@
 # Dynamic Graphical Memory Implementation
 
-- [**planning.py**](./sg_specs/planning.md) includes examples on how to use this graph with graph_search.
-- [**graph_sparsification.py**](./sg_specs/graph_sparsification.md) examples on how to sparsify a graph
+- [**planning.py**](./sg_specs/planning.md) shows how to use this graph with graph_search.
+- [**graph_sparsification.py**](./sg_specs/graph_sparsification.md) shows how to sparsify a graph
 - [**batch_sparsification.py**](./sg_specs/batch_sparsification.md)  efficiently sparsify a graph with as a batch
+- [**incremental_api.py**](./specs/incremental_api.md) shows how to extend with sparsity
 
 ## Usage
 

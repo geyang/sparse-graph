@@ -47,7 +47,7 @@ class AsymMesh:
     meta = None
     z_mask = None
 
-    def __init__(self, n, dim, k, kernel_fn, embed_fn=None,  img_dim=None, neighbor_r=1, d_max=1):
+    def __init__(self, n, dim, k, kernel_fn, embed_fn=None, img_dim=None, neighbor_r=1, d_max=1):
         self.n = n
         self.dim = dim
         self.k = k
@@ -121,6 +121,21 @@ class AsymMesh:
         spots = self.indices[mask_spots]
         self.z_mask[:] = False
         self.z_mask[spots] = True
+
+    def sparse_extend(self, images, *, r_min, meta=None):
+        zs = self.embed_fn(images)
+        spots = self.dedupe(images=zs, r_min=r_min)
+        zs = zs[spots]
+        ds = self.to_goal(zs_2=zs)
+        images = images[spots]
+        meta = meta if meta is None else meta[spots]
+        if ds.size == 0:
+            return self.extend(zs, images=images, meta=meta)
+        else:
+            m = ds.min(axis=0) >= r_min
+            if m.any():
+                return self.extend(zs[m], images=images[m],
+                                   meta=None if meta is None else meta[m])
 
     def update_zs(self):
         self.zs[self.z_mask] = self.embed_fn(self.images[self.z_mask])

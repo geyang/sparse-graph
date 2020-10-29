@@ -41,7 +41,7 @@ def spec_batch_add(xys, r_min):
         if ds.size == 0:
             graph.extend(xys, images=xys, meta=xys)
         else:
-            m = ds.min(axis=-1) >= r_min
+            m = ds.min(axis=0) >= r_min
             if m.any():
                 graph.extend(xys[m], images=xys[m], meta=xys[m])
         graph.update_edges()
