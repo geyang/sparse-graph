@@ -2,14 +2,15 @@ from cmx import doc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
-from sparse_graphs.asym_graph import AsymMesh, l2, id2D
+from sparse_graphs.asym_graph import AsymMesh
+from sg_specs.utils import id2D, l2
 
 
-def spec_sparse_graph(xys, r_min):
+def spec_sparse_graph(xys, d_min):
     doc @ f"""
     ## Sparse Graph Construction
 
-    Only insert nodes when it is at least `r_min={r_min}` away 
+    Only insert nodes when it is at least `d_min={d_min}` away 
     from existing nodes.
     """
     with doc:
@@ -18,7 +19,7 @@ def spec_sparse_graph(xys, r_min):
         for xy in xys:
             ds = graph.to_goal(zs_2=xy[None, :])
             # when the graph is empty, the ds.size can be zero.
-            if ds.size == 0 or ds.min() >= r_min:
+            if ds.size == 0 or ds.min() >= d_min:
                 graph.extend(xy[None, :], images=xy[None, :], meta=xy[None, :])
 
         graph.update_zs()
@@ -34,19 +35,11 @@ def plot_trajectory_2d(path, color='black', **kwargs):
 
 
 if __name__ == '__main__':
-    doc @ """
-    # Advanced Example
-    
-    **Features**
-    - [x] test for distance to other nodes before insertion
-    - [x] run graph search with this graph and show the shortest path
-    """
-
     with doc:
         np.random.seed(100)
         xys = np.random.uniform(-20, 20, [1600, 2])
 
-    graph = spec_sparse_graph(xys, r_min=2)
+    graph = spec_sparse_graph(xys, d_min=2)
 
     doc @ """
     ## Planning
@@ -67,19 +60,19 @@ if __name__ == '__main__':
     # Plot here.
     r = doc.table().figure_row()
 
-    nodes = np.stack(graph.meta[graph.z_mask]).T
+    nodes = np.stack(graph['meta']).T
     # plt.scatter(*nodes, color="#23aaff", edgecolor='none', alpha=0.6, s=50)
     plt.gca().set_aspect('equal')
     for i, j in tqdm(graph.edges, desc="edges"):
-        a, b = graph.meta[[i, j]]
+        a, b = graph._meta['meta'][[i, j]]
         plt.plot([a[0], b[0]], [a[1], b[1]], color="red", linewidth=0.4)
     r.savefig(f"figures/before_planning.png?ts={doc.now('%f')}", title="Sparse")
     plt.close()
 
-    nodes = np.stack(graph.meta[graph.z_mask]).T
+    nodes = np.stack(graph['meta']).T
     plt.scatter(*nodes, color="black", edgecolor='none', alpha=0.1, s=50)
     plt.gca().set_aspect('equal')
-    plot_trajectory_2d(graph.meta[path])
+    plot_trajectory_2d(graph._meta['meta'][path])
 
     r.savefig(f"figures/path.png?ts={doc.now('%f')}", title="Plan")
     plt.close()

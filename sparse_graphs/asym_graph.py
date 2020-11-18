@@ -1,10 +1,6 @@
+from collections import defaultdict
 from copy import deepcopy
-import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
-
-id2D = lambda xy: xy[:, :2]
-l2 = lambda a, b: np.linalg.norm(a - b, ord=2, axis=-1)
 
 
 class EdgeView:
@@ -41,10 +37,10 @@ class EdgeView:
 
 
 class AsymMesh:
-    zs = None
-    zs_2 = None
+    _zs = None
+    _zs_2 = None
     images = None
-    meta = None
+    _meta = None
     z_mask = None
 
     def __init__(self, n, dim, k, kernel_fn, embed_fn=None, img_dim=None, neighbor_r=1, d_max=1):
@@ -59,12 +55,12 @@ class AsymMesh:
 
         if img_dim is not None:
             self.images = np.zeros([n, *img_dim])
-        self.zs = np.zeros([n, dim])
-        self.zs_2 = np.zeros([n, dim])
+        self._zs = np.zeros([n, dim])
+        self._zs_2 = np.zeros([n, dim])
         self.z_mask = np.full(n, False)
         self.ds = np.full([n, k], float('inf'))
         self.adj = np.full([n, k], np.nan, dtype=np.int32)
-        self.meta = np.empty([n], dtype=object)
+        self._meta = defaultdict(lambda: np.empty([n], dtype=object))
 
     def __len__(self):
         return self.z_mask.sum()
@@ -73,36 +69,65 @@ class AsymMesh:
         """expand the size of the graph"""
         pass
 
-    def extend(self, zs=None, images=None, meta=None):
+    def extend(self, zs=None, images=None, **meta):
         if zs is None:
             assert images is not None, "images has to be specified if zs is None."
             zs = self.embed_fn(images)
         l, dim = zs.shape
         spots = np.argpartition(self.z_mask, l)[:l]
-        self.zs[spots] = zs
+        self._zs[spots] = zs
         if images is not None:
             self.images[spots] = images
-        if meta is not None:
-            for s, m in zip(spots, meta):
-                self.meta[s] = deepcopy(m)  # avoid deletion by numpy GC
+        for k, v in meta.items():
+            self._meta[k][spots] = list(v)
+
         self.z_mask[spots] = True
         return spots
+
+    @property
+    def zs(self):
+        return self._zs[self.z_mask]
+
+    @property
+    def zs_2(self):
+        return self._zs_2[self.z_mask]
 
     @property
     def indices(self):
         return np.arange(self.n, dtype=int)[self.z_mask]
 
+    @property
+    def pairwise(self):
+        zs = self._zs[self.z_mask]
+        return self.kernel_fn(zs[:, None, :], zs[None, ...])
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            value = self._meta.get(item, None)
+            return None if value is None else value[self.z_mask]
+
+    @property
+    def d0(self):
+        l = len(self)
+        inverse_index = np.full(self.n, -1, dtype=int)
+        inverse_index[self.indices] = range(l)
+        pairwise = np.full([l, l], float('inf'))
+        np.fill_diagonal(pairwise, 0)
+        for n, i in enumerate(self.indices):
+            pairwise[n, inverse_index[self.adj[i]]] = self.ds[i]
+        return pairwise
+
     def to_goal(self, zs_2=None, images=None):
         if zs_2 is None:
             assert images is not None, "images has to be specified if zs is None."
             zs_2 = self.embed_fn(images)
-        zs = self.zs[self.z_mask]
+        zs = self._zs[self.z_mask]
         pairwise = self.kernel_fn(zs[:, None, :], zs_2[None, ...])
         mask = pairwise >= self.d_max
         pairwise[mask] = float('inf')
         return pairwise
 
-    def dedupe(self, zs=None, images=None, *, r_min):
+    def dedupe(self, zs=None, images=None, *, d_min):
         if zs is None:
             assert images is not None, "Need `images` when `zs` is None."
             zs = self.embed_fn(images)
@@ -110,40 +135,38 @@ class AsymMesh:
         pairwise[np.eye(len(zs), dtype=bool)] = float('inf')
         spots = []
         for row_n, row in enumerate(pairwise):
-            if row_n and row[:row_n].min() < r_min:
+            if row_n and row[:row_n].min() < d_min:
                 pairwise[:, row_n] = float('inf')
             else:
                 spots.append(row_n)
         return spots
 
-    def dedupe_(self, r_min):
-        mask_spots = self.dedupe(self.zs[self.z_mask], r_min=r_min)
+    def dedupe_(self, d_min):
+        mask_spots = self.dedupe(self._zs[self.z_mask], d_min=d_min)
         spots = self.indices[mask_spots]
         self.z_mask[:] = False
         self.z_mask[spots] = True
 
-    def sparse_extend(self, images, *, r_min, meta=None):
+    def sparse_extend(self, images, d_min, **meta):
         zs = self.embed_fn(images)
-        spots = self.dedupe(images=zs, r_min=r_min)
+        spots = self.dedupe(images=zs, d_min=d_min)
         zs = zs[spots]
         ds = self.to_goal(zs_2=zs)
         images = images[spots]
-        meta = meta if meta is None else meta[spots]
+        meta = {k: v[spots] for k, v in meta.items()}
         if ds.size == 0:
-            return self.extend(zs, images=images, meta=meta)
+            return self.extend(zs, images=images, **meta)
         else:
-            m = ds.min(axis=0) >= r_min
+            m = ds.min(axis=0) >= d_min
             if m.any():
-                return self.extend(zs[m], images=images[m],
-                                   meta=None if meta is None else meta[m])
+                return self.extend(zs[m], images=images[m], **{k: v[m] for k, v in meta.items()})
 
     def update_zs(self):
-        self.zs[self.z_mask] = self.embed_fn(self.images[self.z_mask])
+        self._zs[self.z_mask] = self.embed_fn(self.images[self.z_mask])
 
     def update_edges(self):
-        zs, l = self.zs[self.z_mask], self.z_mask.sum()
-        # zs_2 = self.zs_2[self.z_mask]
-        pairwise = self.kernel_fn(zs[:, None, :], zs[None, ...])
+        pairwise = self.pairwise
+        l = len(pairwise)
         mask = pairwise >= self.d_max
         pairwise[mask] = float('inf')
         pairwise[np.eye(l, dtype=bool)] = float('inf')
@@ -159,35 +182,3 @@ class AsymMesh:
 
     def neighbors(self, n):
         return [n for n, d in zip(self.adj[n], self.ds[n]) if d < self.d_max]
-
-    # plotting and vis
-    def plot_2d(self, filename=None, title=None, **_):
-        from ml_logger import logger
-
-        logger.print(f"n: {len(self)} e: {len(self.edges)} d/mean: {self.ds.mean()}", file="graph_summary.md")
-        # edges = list(self.edges)[::ceil(len(self.edges) / 4000)]
-        edges = self.edges
-        for i, j in tqdm(edges, desc="painting edges"):
-            a, b = self.meta[[i, j]]
-            plt.plot([a[0], b[0]], [a[1], b[1]], color="red", linewidth=0.4)
-        plt.gca().set_aspect('equal')
-        if title:
-            plt.title(title)
-        plt.tight_layout()
-        if filename:
-            logger.savefig(filename, **_)
-            plt.close()
-
-    def plot_2d_scatter(self, filename=None, title=None, **_):
-        from ml_logger import logger
-
-        xys = np.stack(self.meta[self.indices])
-
-        plt.scatter(*xys.T, color="gray", s=40)
-        plt.gca().set_aspect('equal')
-        if title:
-            plt.title(title)
-        plt.tight_layout()
-        if filename:
-            logger.savefig(filename, **_)
-            plt.close()

@@ -17,13 +17,13 @@ The new dedupe API allows us to do this in a batch fashion:
 
 .. code-block:: python
 
-   spots = graph.dedupe(images=xys, r_min=r_min)
+   spots = graph.dedupe(images=xys, d_min=d_min)
    xys = xys[spots]
    ds = graph.to_goal(zs_2=xys)
    if ds.size == 0:
        graph.extend(xys, images=xys, meta=xys)
    else:
-       m = ds.min(axis=0) >= r_min
+       m = ds.min(axis=0) >= d_min
        if m.any():
            graph.extend(xys[m], images=xys[m], meta=xys[m])
        graph.update_edges()
