@@ -1,5 +1,5 @@
 ```python
-np.random.seed(100)
+np.random.seed(500)
 xys = np.random.uniform(-20, 20, [1600, 2])
 ```
 

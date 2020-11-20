@@ -39,28 +39,37 @@ class EdgeView:
 class AsymMesh:
     _zs = None
     _zs_2 = None
-    images = None
+    _images = None
     _meta = None
     z_mask = None
 
-    def __init__(self, n, dim, k, kernel_fn, embed_fn=None, img_dim=None, neighbor_r=1, d_max=1):
+    def __init__(self, n, dim, k, kernel_fn, embed_fn=None, img_dim=None, d_max=1):
         self.n = n
         self.dim = dim
         self.k = k
         self.kernel_fn = kernel_fn
         self.embed_fn = embed_fn
         self.img_dim = img_dim
-        self.neighbor_r = neighbor_r
         self.d_max = d_max
 
         if img_dim is not None:
-            self.images = np.zeros([n, *img_dim])
+            self._images = np.zeros([n, *img_dim])
         self._zs = np.zeros([n, dim])
         self._zs_2 = np.zeros([n, dim])
         self.z_mask = np.full(n, False)
         self.ds = np.full([n, k], float('inf'))
         self.adj = np.full([n, k], np.nan, dtype=np.int32)
         self._meta = defaultdict(lambda: np.empty([n], dtype=object))
+
+    @property
+    def images(self):
+        return self._images[self.z_mask]
+
+    def keys(self):
+        return self._meta.keys()
+
+    def items(self):
+        yield from ([k, self[k]] for k in self.keys())
 
     def __len__(self):
         return self.z_mask.sum()
@@ -77,7 +86,7 @@ class AsymMesh:
         spots = np.argpartition(self.z_mask, l)[:l]
         self._zs[spots] = zs
         if images is not None:
-            self.images[spots] = images
+            self._images[spots] = images
         for k, v in meta.items():
             self._meta[k][spots] = list(v)
 
@@ -162,7 +171,7 @@ class AsymMesh:
                 return self.extend(zs[m], images=images[m], **{k: v[m] for k, v in meta.items()})
 
     def update_zs(self):
-        self._zs[self.z_mask] = self.embed_fn(self.images[self.z_mask])
+        self._zs[self.z_mask] = self.embed_fn(self._images[self.z_mask])
 
     def update_edges(self):
         pairwise = self.pairwise
@@ -170,11 +179,14 @@ class AsymMesh:
         mask = pairwise >= self.d_max
         pairwise[mask] = float('inf')
         pairwise[np.eye(l, dtype=bool)] = float('inf')
-        knn = np.argpartition(pairwise, self.k, axis=-1)[:, :self.k]
+        if l <= self.k:
+            knn = np.arange(l, dtype=int).repeat(l).reshape(l, l).T
+        else:
+            knn = np.argpartition(pairwise, self.k, axis=-1)[:, :self.k]
         indices = self.indices
         for ind, ds, nn, m in zip(indices, pairwise, knn, mask):
-            self.ds[ind] = ds[nn]
-            self.adj[ind, :] = indices[nn]
+            self.ds[ind, :len(nn)] = ds[nn]
+            self.adj[ind, :len(nn)] = indices[nn]
 
     @property
     def edges(self):
