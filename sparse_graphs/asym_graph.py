@@ -54,6 +54,7 @@ class AsymMesh:
 
         if img_dim is not None:
             self._images = np.zeros([n, *img_dim])
+
         self._zs = np.zeros([n, dim])
         self._zs_2 = np.zeros([n, dim])
         self.z_mask = np.full(n, False)
