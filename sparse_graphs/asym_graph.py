@@ -52,19 +52,12 @@ class AsymMesh:
         self.img_dim = img_dim
         self.d_max = d_max
 
-        if img_dim is not None:
-            self._images = np.zeros([n, *img_dim])
-
         self._zs = np.zeros([n, dim])
         self._zs_2 = np.zeros([n, dim])
         self.z_mask = np.full(n, False)
         self.ds = np.full([n, k], float('inf'))
         self.adj = np.full([n, k], np.nan, dtype=np.int32)
         self._meta = defaultdict(lambda: np.empty([n], dtype=object))
-
-    @property
-    def images(self):
-        return self._images[self.z_mask]
 
     def keys(self):
         return self._meta.keys()
@@ -87,7 +80,7 @@ class AsymMesh:
         spots = np.argpartition(self.z_mask, l)[:l]
         self._zs[spots] = zs
         if images is not None:
-            self._images[spots] = images
+            self._meta['images'][spots] = list(images)
         for k, v in meta.items():
             self._meta[k][spots] = list(v)
 
@@ -172,7 +165,7 @@ class AsymMesh:
                 return self.extend(zs[m], images=images[m], **{k: v[m] for k, v in meta.items()})
 
     def update_zs(self):
-        self._zs[self.z_mask] = self.embed_fn(self._images[self.z_mask])
+        self._zs[self.z_mask] = self.embed_fn(np.stack(self['images']))
 
     def update_edges(self):
         pairwise = self.pairwise
