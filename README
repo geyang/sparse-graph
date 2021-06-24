@@ -1,6 +1,18 @@
 Dynamic Graphical Memory Implementation
 =======================================
 
+-  `planning.py <https://github.com/geyang/sparse_graph/blob/master/sg_specs/planning.md>`__ shows how to use this graph
+   with graph_search.
+-  `graph_sparsification.py <https://github.com/geyang/sparse_graph/blob/master/sg_specs/graph_sparsification.md>`__
+   shows how to sparsify a graph
+-  `batch_sparsification.py <https://github.com/geyang/sparse_graph/blob/master/sg_specs/batch_sparsification.md>`__
+   efficiently sparsify a graph with as a batch
+-  `incremental_api.py <https://github.com/geyang/sparse_graph/blob/master/specs/incremental_api.md>`__ shows how to
+   extend with sparsity
+
+Usage
+-----
+
 To instantiate a graph:
 
 .. code-block:: python
@@ -17,14 +29,14 @@ The new dedupe API allows us to do this in a batch fashion:
 
 .. code-block:: python
 
-   spots = graph.dedupe(images=xys, d_min=d_min)
+   spots = graph.dedupe(images=xys, r_min=r_min)
    xys = xys[spots]
    ds = graph.to_goal(zs_2=xys)
    if ds.size == 0:
        graph.extend(xys, images=xys, meta=xys)
    else:
-       m = ds.min(axis=0) >= d_min
-       if m.any():
+       m = ds.min(axis=-1) >= r_min
+       if m.sum() > 0:
            graph.extend(xys[m], images=xys[m], meta=xys[m])
        graph.update_edges()
 
@@ -35,6 +47,11 @@ The new dedupe API allows us to do this in a batch fashion:
 |                     |              | graph in comparison to the     |
 |                     |              | sparse graph.                  |
 +---------------------+--------------+--------------------------------+
+
+To Experiment
+-------------
+
+Import this module in the method module.
 
 .. |dense_graph| image:: figures/random_graph.png?raw=true
 .. |image1| image:: figures/batch_graph.png?raw=true
